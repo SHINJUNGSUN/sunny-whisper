@@ -6,7 +6,7 @@ use tauri::{App, AppHandle, Manager};
 pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let record_item = MenuItem::with_id(app, "record", "Start Recording", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Quit Nobs Whisper", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit Sunny's Whisper", true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&record_item, &settings_item, &quit_item])?;
 

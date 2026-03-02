@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    nobs_whisper_lib::run()
+    sunnys_whisper_lib::run()
 }

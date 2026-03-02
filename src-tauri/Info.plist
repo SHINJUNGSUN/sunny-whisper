@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Nobs Whisper needs microphone access to record your voice for transcription.</string>
+    <string>Sunny's Whisper needs microphone access to record your voice for transcription.</string>
 </dict>
 </plist>

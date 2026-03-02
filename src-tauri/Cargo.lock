@@ -2676,35 +2676,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
-name = "nobs-whisper"
-version = "0.1.19"
-dependencies = [
- "arboard",
- "block",
- "cocoa",
- "core-foundation 0.10.1",
- "core-graphics",
- "cpal",
- "dirs 5.0.1",
- "enigo",
- "env_logger",
- "futures-util",
- "log",
- "objc",
- "reqwest",
- "rubato",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
- "thiserror 2.0.18",
- "tokio",
- "whisper-rs",
-]
-
-[[package]]
 name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4451,6 +4422,35 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "sunnys-whisper"
+version = "0.1.19"
+dependencies = [
+ "arboard",
+ "block",
+ "cocoa",
+ "core-foundation 0.10.1",
+ "core-graphics",
+ "cpal",
+ "dirs 5.0.1",
+ "enigo",
+ "env_logger",
+ "futures-util",
+ "log",
+ "objc",
+ "reqwest",
+ "rubato",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+ "thiserror 2.0.18",
+ "tokio",
+ "whisper-rs",
+]
 
 [[package]]
 name = "swift-rs"

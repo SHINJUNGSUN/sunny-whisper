@@ -1,12 +1,12 @@
 [package]
-name = "nobs-whisper"
+name = "sunnys-whisper"
 version = "0.1.19"
 description = "Local Whisper Voice Typing App for macOS"
 authors = ["eatnug"]
 edition = "2021"
 
 [lib]
-name = "nobs_whisper_lib"
+name = "sunnys_whisper_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
