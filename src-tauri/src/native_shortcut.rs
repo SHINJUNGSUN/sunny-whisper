@@ -1,4 +1,5 @@
 use crate::state::SharedAppState;
+use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager};
 
@@ -421,4 +422,244 @@ pub fn start_native_listener(app: AppHandle, state: SharedAppState) {
             }
         }
     });
+}
+
+// ============================================================
+// Media Key Listener (AirPods/EarPods play/pause button)
+// ============================================================
+
+static MEDIA_KEY_ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Update media key enabled state (called when config changes)
+pub fn update_media_key_enabled(enabled: bool) {
+    MEDIA_KEY_ENABLED.store(enabled, Ordering::SeqCst);
+    log::info!("Media key enabled: {}", enabled);
+}
+
+// NX_SYSDEFINED event type (14) is not exposed in the core-graphics crate,
+// so we use raw C FFI to create a separate CGEventTap for media key events.
+const NX_SYSDEFINED_EVENT_TYPE: u32 = 14;
+const NX_KEYTYPE_PLAY: i64 = 16;
+const MEDIA_KEY_SUBTYPE: i16 = 8;
+
+// Raw CGEventTap FFI for NX_SYSDEFINED events
+mod media_ffi {
+    use std::ffi::c_void;
+
+    pub type CGEventTapCallBack = unsafe extern "C" fn(
+        proxy: *mut c_void,
+        event_type: u32,
+        event: *mut c_void,
+        user_info: *mut c_void,
+    ) -> *mut c_void;
+
+    extern "C" {
+        pub fn CGEventTapCreate(
+            tap: u32,
+            place: u32,
+            options: u32,
+            events_of_interest: u64,
+            callback: CGEventTapCallBack,
+            user_info: *mut c_void,
+        ) -> *mut c_void;
+
+        pub fn CGEventTapEnable(tap: *mut c_void, enable: bool);
+
+        pub fn CFMachPortCreateRunLoopSource(
+            allocator: *const c_void,
+            port: *mut c_void,
+            order: i64,
+        ) -> *mut c_void;
+
+        pub fn CFRunLoopGetCurrent() -> *mut c_void;
+
+        pub fn CFRunLoopAddSource(
+            rl: *mut c_void,
+            source: *mut c_void,
+            mode: *const c_void,
+        );
+
+        pub fn CFRunLoopRun();
+    }
+}
+
+struct MediaKeyContext {
+    app: AppHandle,
+    state: SharedAppState,
+    tap_port: *mut c_void,
+}
+
+// Send + Sync for MediaKeyContext (pointers are only accessed from callback thread)
+unsafe impl Send for MediaKeyContext {}
+unsafe impl Sync for MediaKeyContext {}
+
+// CGEventTap disabled event types
+const CG_EVENT_TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFFFFFE;
+const CG_EVENT_TAP_DISABLED_BY_USER_INPUT: u32 = 0xFFFFFFFF;
+
+/// CGEventTap callback for media key events
+unsafe extern "C" fn media_key_tap_callback(
+    _proxy: *mut c_void,
+    event_type: u32,
+    event: *mut c_void,
+    user_info: *mut c_void,
+) -> *mut c_void {
+    // Re-enable tap if it was disabled by the system
+    if event_type == CG_EVENT_TAP_DISABLED_BY_TIMEOUT
+        || event_type == CG_EVENT_TAP_DISABLED_BY_USER_INPUT
+    {
+        log::warn!("Media key event tap was disabled (type={}), re-enabling", event_type);
+        let context = &*(user_info as *const MediaKeyContext);
+        media_ffi::CGEventTapEnable(context.tap_port, true);
+        return event;
+    }
+
+    // Only handle NX_SYSDEFINED events
+    if event_type != NX_SYSDEFINED_EVENT_TYPE {
+        return event;
+    }
+
+    log::debug!("NX_SYSDEFINED event received (media_key_enabled={})",
+        MEDIA_KEY_ENABLED.load(Ordering::SeqCst));
+
+    // Check if media key handling is enabled
+    if !MEDIA_KEY_ENABLED.load(Ordering::SeqCst) {
+        return event; // Pass through when disabled
+    }
+
+    // Convert CGEvent to NSEvent to access subtype and data1
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+
+    let ns_event: *mut Object = msg_send![class!(NSEvent), eventWithCGEvent: event];
+    if ns_event.is_null() {
+        log::warn!("Failed to convert CGEvent to NSEvent");
+        return event;
+    }
+
+    let subtype: i16 = msg_send![ns_event, subtype];
+    log::debug!("NX_SYSDEFINED subtype={}", subtype);
+
+    if subtype != MEDIA_KEY_SUBTYPE {
+        return event; // Not a media remote event
+    }
+
+    let data1: i64 = msg_send![ns_event, data1];
+    let key_code = (data1 >> 16) & 0xFFFF;
+    let key_flags = data1 & 0xFFFF;
+    let key_is_down = ((key_flags & 0xFF00) >> 8) == 0x0A;
+    let key_repeat = (key_flags & 0x1) != 0;
+
+    log::debug!(
+        "Media key: code={}, down={}, repeat={}, data1=0x{:X}",
+        key_code,
+        key_is_down,
+        key_repeat,
+        data1
+    );
+
+    if key_code == NX_KEYTYPE_PLAY && key_is_down && !key_repeat {
+        log::info!("Play/pause media key pressed - toggling recording");
+
+        let context = &*(user_info as *const MediaKeyContext);
+        match crate::state::toggle_recording_with_app(&context.app, &context.state) {
+            Ok(snapshot) => {
+                if snapshot.is_recording {
+                    log::info!("Recording started via media key");
+                } else {
+                    log::info!("Recording stopped via media key");
+                }
+            }
+            Err(e) => log::error!("Failed to toggle recording via media key: {}", e),
+        }
+
+        return std::ptr::null_mut(); // Consume the event (prevent music playback)
+    }
+
+    event // Pass through other events
+}
+
+/// Start listening for media key events (AirPods/EarPods play/pause button)
+#[cfg(target_os = "macos")]
+pub fn start_media_key_listener(app: AppHandle, state: SharedAppState) {
+    // Read initial config
+    if let Ok(state_guard) = state.lock() {
+        MEDIA_KEY_ENABLED.store(state_guard.config.media_key_enabled, Ordering::SeqCst);
+    }
+
+    std::thread::spawn(move || {
+        log::info!("Starting media key listener");
+
+        // First create tap, then create context with tap_port
+        unsafe {
+            let mask: u64 = 1 << NX_SYSDEFINED_EVENT_TYPE;
+
+            // Create a temporary context to pass to CGEventTapCreate
+            // We'll update the tap_port after creation
+            let context = Box::new(MediaKeyContext {
+                app,
+                state,
+                tap_port: std::ptr::null_mut(),
+            });
+            let context_ptr = Box::into_raw(context);
+
+            // Create event tap: HID level, head insert, active (can consume events)
+            let tap_port = media_ffi::CGEventTapCreate(
+                0, // kCGHIDEventTap
+                0, // kCGHeadInsertEventTap
+                0, // kCGEventTapOptionDefault (active filter)
+                mask,
+                media_key_tap_callback,
+                context_ptr as *mut c_void,
+            );
+
+            if tap_port.is_null() {
+                log::error!(
+                    "Failed to create media key event tap (check accessibility permissions)"
+                );
+                let _ = Box::from_raw(context_ptr);
+                return;
+            }
+
+            // Store tap_port in context for re-enabling
+            (*context_ptr).tap_port = tap_port;
+            let context_void = context_ptr as *mut c_void;
+
+            // Create run loop source and add to current run loop
+            let source = media_ffi::CFMachPortCreateRunLoopSource(
+                std::ptr::null(),
+                tap_port,
+                0,
+            );
+
+            if source.is_null() {
+                log::error!("Failed to create run loop source for media key tap");
+                let _ = Box::from_raw(context_void as *mut MediaKeyContext);
+                return;
+            }
+
+            let run_loop = media_ffi::CFRunLoopGetCurrent();
+
+            // Use kCFRunLoopCommonModes from core-foundation
+            media_ffi::CFRunLoopAddSource(
+                run_loop,
+                source,
+                kCFRunLoopCommonModes as *const _ as *const c_void,
+            );
+            media_ffi::CGEventTapEnable(tap_port, true);
+
+            log::info!("Media key listener started successfully");
+            media_ffi::CFRunLoopRun();
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn start_media_key_listener(_app: AppHandle, _state: SharedAppState) {
+    // No-op on non-macOS
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn update_media_key_enabled(_enabled: bool) {
+    // No-op on non-macOS
 }

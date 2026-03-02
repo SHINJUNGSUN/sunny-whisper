@@ -25,6 +25,7 @@
     pushToTalk: boolean;
     claudeCodeMode: "directPaste" | "printMode";
     customVocabulary: string;
+    mediaKeyEnabled: boolean;
   }
 
   let models = $state<ModelInfo[]>([]);
@@ -37,6 +38,7 @@
     pushToTalk: false,
     claudeCodeMode: "directPaste",
     customVocabulary: "",
+    mediaKeyEnabled: false,
   });
   let downloadingModel = $state<string | null>(null);
   let downloadProgress = $state<number>(0);
@@ -561,6 +563,25 @@
           </div>
         </div>
         <div class="hint">Maximum recording time (10-600s)</div>
+      </div>
+
+      <div class="group">
+        <label>Media Key</label>
+        <div class="shortcut-display">
+          <span class="shortcut-value">
+            {config.mediaKeyEnabled ? "Enabled" : "Disabled"}
+          </span>
+          <button class="btn-text" onclick={() => { config.mediaKeyEnabled = !config.mediaKeyEnabled; saveConfig(); }}>
+            {config.mediaKeyEnabled ? "Disable" : "Enable"}
+          </button>
+        </div>
+        <div class="hint">
+          {#if config.mediaKeyEnabled}
+            AirPods/EarPods play/pause toggles recording
+          {:else}
+            Use earphone media button to toggle recording
+          {/if}
+        </div>
       </div>
     {/if}
 

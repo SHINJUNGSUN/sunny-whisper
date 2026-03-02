@@ -47,6 +47,9 @@ pub struct AppConfig {
     /// Claude Code integration mode
     #[serde(default)]
     pub claude_code_mode: ClaudeCodeMode,
+    /// Enable media key (AirPods/EarPods play/pause) to toggle recording
+    #[serde(default)]
+    pub media_key_enabled: bool,
 }
 
 fn default_max_recording_duration() -> u64 {
@@ -68,6 +71,7 @@ impl Default for AppConfig {
             custom_vocabulary: default_custom_vocabulary(),
             push_to_talk: false,
             claude_code_mode: ClaudeCodeMode::default(),
+            media_key_enabled: false,
         }
     }
 }
@@ -148,8 +152,17 @@ pub fn set_config(
     let new_shortcut = config.shortcut.clone();
     let old_shortcut = app_state.active_shortcut.clone();
 
+    // Check if media key setting changed
+    let media_key_changed = app_state.config.media_key_enabled != config.media_key_enabled;
+    let new_media_key_enabled = config.media_key_enabled;
+
     // Update config in state
     app_state.config = config.clone();
+
+    // Update media key listener
+    if media_key_changed {
+        crate::native_shortcut::update_media_key_enabled(new_media_key_enabled);
+    }
 
     // Load model if changed and a model is selected
     if model_changed {

@@ -70,6 +70,10 @@ pub fn run() {
             log::info!("Starting native keyboard listener");
             native_shortcut::start_native_listener(app_handle.clone(), state.clone());
 
+            // Start media key listener (AirPods/EarPods play/pause button)
+            log::info!("Starting media key listener");
+            native_shortcut::start_media_key_listener(app_handle.clone(), state.clone());
+
             // Also register global shortcut if current shortcut is not native
             let is_native = {
                 if let Ok(s) = state.lock() {
