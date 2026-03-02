@@ -694,6 +694,7 @@ pub fn stop_recording_with_app(
     } else {
         Some(state_guard.config.custom_vocabulary.clone())
     };
+    let claude_code_mode = state_guard.config.claude_code_mode.clone();
 
     // Set transcribing state and release lock BEFORE any heavy processing
     state_guard.is_transcribing = true;
@@ -816,36 +817,56 @@ pub fn stop_recording_with_app(
             let final_snapshot = state_guard.snapshot();
             drop(state_guard);
 
-            // Type the text or copy to clipboard - must run on main thread
+            // Handle text based on Claude Code mode
             let text_to_type = final_text;
             let app_for_typing = app_clone.clone();
             let snapshot_for_typing = final_snapshot.clone();
-            let _ = app_clone.run_on_main_thread(move || {
-                match type_transcription(&text_to_type) {
-                    Ok(true) => {
-                        log::info!("Text typed successfully");
-                        emit_state_change(&app_for_typing, &snapshot_for_typing);
+
+            match claude_code_mode {
+                crate::config::ClaudeCodeMode::PrintMode => {
+                    // Send to Claude Code via `claude -p`
+                    log::info!("Sending transcription to Claude Code (PrintMode)");
+                    match input::send_to_claude_code(&text_to_type) {
+                        Ok(response) => {
+                            log::info!("Claude Code responded: {} chars", response.len());
+                            input::show_notification("Sunny's Whisper", "Claude Code response ready");
+                        }
+                        Err(e) => {
+                            log::error!("Failed to send to Claude Code: {}", e);
+                            input::show_notification("Sunny's Whisper", &format!("Claude Code error: {}", e));
+                        }
                     }
-                    Ok(false) => {
-                        log::info!("Text copied to clipboard (no focused input)");
-                        let _ = indicator::set_indicator_status(&app_for_typing, "copied");
-                        // Emit state change on a separate thread after delay
-                        let app_delayed = app_for_typing.clone();
-                        let snapshot_delayed = snapshot_for_typing.clone();
-                        std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_millis(1000));
-                            let app_for_emit = app_delayed.clone();
-                            let _ = app_delayed.run_on_main_thread(move || {
-                                emit_state_change(&app_for_emit, &snapshot_delayed);
-                            });
-                        });
-                    }
-                    Err(e) => {
-                        log::error!("Failed to type/copy text: {}", e);
-                        emit_state_change(&app_for_typing, &snapshot_for_typing);
-                    }
+                    emit_state_change(&app_for_typing, &snapshot_for_typing);
                 }
-            });
+                crate::config::ClaudeCodeMode::DirectPaste => {
+                    // Type text or copy to clipboard - must run on main thread
+                    let _ = app_clone.run_on_main_thread(move || {
+                        match type_transcription(&text_to_type) {
+                            Ok(true) => {
+                                log::info!("Text typed successfully");
+                                emit_state_change(&app_for_typing, &snapshot_for_typing);
+                            }
+                            Ok(false) => {
+                                log::info!("Text copied to clipboard (no focused input)");
+                                let _ = indicator::set_indicator_status(&app_for_typing, "copied");
+                                let app_delayed = app_for_typing.clone();
+                                let snapshot_delayed = snapshot_for_typing.clone();
+                                std::thread::spawn(move || {
+                                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                                    let app_for_emit = app_delayed.clone();
+                                    let _ = app_delayed.run_on_main_thread(move || {
+                                        emit_state_change(&app_for_emit, &snapshot_delayed);
+                                    });
+                                });
+                            }
+                            Err(e) => {
+                                log::error!("Failed to type/copy text: {}", e);
+                                emit_state_change(&app_for_typing, &snapshot_for_typing);
+                            }
+                        }
+                    });
+                }
+            }
         }
     });
 

@@ -11,6 +11,19 @@ pub enum ConfigError {
     Json(#[from] serde_json::Error),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum ClaudeCodeMode {
+    DirectPaste,
+    PrintMode,
+}
+
+impl Default for ClaudeCodeMode {
+    fn default() -> Self {
+        Self::DirectPaste
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
@@ -31,6 +44,9 @@ pub struct AppConfig {
     /// Push-to-talk mode: record while key is held, stop when released
     #[serde(default)]
     pub push_to_talk: bool,
+    /// Claude Code integration mode
+    #[serde(default)]
+    pub claude_code_mode: ClaudeCodeMode,
 }
 
 fn default_max_recording_duration() -> u64 {
@@ -51,6 +67,7 @@ impl Default for AppConfig {
             max_recording_duration: default_max_recording_duration(),
             custom_vocabulary: default_custom_vocabulary(),
             push_to_talk: false,
+            claude_code_mode: ClaudeCodeMode::default(),
         }
     }
 }

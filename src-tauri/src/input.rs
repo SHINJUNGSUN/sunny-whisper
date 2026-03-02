@@ -168,6 +168,31 @@ pub fn show_notification(_title: &str, _message: &str) {
     // No-op on other platforms
 }
 
+/// Send text to Claude Code via `claude -p` command
+pub fn send_to_claude_code(text: &str) -> Result<String, InputError> {
+    use std::process::Command;
+
+    log::info!("Sending to Claude Code: {} chars", text.len());
+
+    let output = Command::new("claude")
+        .arg("-p")
+        .arg(text)
+        .output()
+        .map_err(|e| InputError::InitError(format!("Failed to run claude command: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(InputError::TypeError(format!(
+            "claude -p failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    log::info!("Claude Code response: {} chars", stdout.len());
+    Ok(stdout)
+}
+
 /// Type text or copy to clipboard if no focused input
 pub fn type_or_copy(text: &str) -> Result<bool, InputError> {
     // Check if there's a focused input field

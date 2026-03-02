@@ -23,6 +23,7 @@
     autoLaunch: boolean;
     maxRecordingDuration: number;
     pushToTalk: boolean;
+    claudeCodeMode: "directPaste" | "printMode";
   }
 
   let models = $state<ModelInfo[]>([]);
@@ -33,6 +34,7 @@
     autoLaunch: false,
     maxRecordingDuration: 60,
     pushToTalk: false,
+    claudeCodeMode: "directPaste",
   });
   let downloadingModel = $state<string | null>(null);
   let downloadProgress = $state<number>(0);
@@ -511,6 +513,33 @@
     {/if}
 
     <div class="group">
+      <label>Claude Code</label>
+      <div class="toggle-group">
+        <button
+          class="toggle-btn"
+          class:active={config.claudeCodeMode === "directPaste"}
+          onclick={() => { config.claudeCodeMode = "directPaste"; saveConfig(); }}
+        >
+          Direct Paste
+        </button>
+        <button
+          class="toggle-btn"
+          class:active={config.claudeCodeMode === "printMode"}
+          onclick={() => { config.claudeCodeMode = "printMode"; saveConfig(); }}
+        >
+          Print Mode
+        </button>
+      </div>
+      <div class="hint">
+        {#if config.claudeCodeMode === "printMode"}
+          Runs <code>claude -p</code> with transcribed text
+        {:else}
+          Pastes text at cursor position (default)
+        {/if}
+      </div>
+    </div>
+
+    <div class="group">
       <label for="language">Language</label>
       <select id="language" bind:value={config.language} onchange={saveConfig}>
         {#each languages as lang}
@@ -892,6 +921,15 @@
     font-style: italic;
   }
 
+  .hint code {
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 10px;
+    background: #f0f0f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-style: normal;
+  }
+
   .toggle-group {
     display: flex;
     border: 1px solid #e0e0e0;
@@ -1090,6 +1128,10 @@
     .toggle-btn.active {
       background: #f5f5f7;
       color: #1c1c1e;
+    }
+
+    .hint code {
+      background: #3a3a3c;
     }
   }
 </style>
