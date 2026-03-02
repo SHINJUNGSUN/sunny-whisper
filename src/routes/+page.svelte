@@ -24,6 +24,7 @@
     maxRecordingDuration: number;
     pushToTalk: boolean;
     claudeCodeMode: "directPaste" | "printMode";
+    customVocabulary: string;
   }
 
   let models = $state<ModelInfo[]>([]);
@@ -35,6 +36,7 @@
     maxRecordingDuration: 60,
     pushToTalk: false,
     claudeCodeMode: "directPaste",
+    customVocabulary: "",
   });
   let downloadingModel = $state<string | null>(null);
   let downloadProgress = $state<number>(0);
@@ -47,6 +49,17 @@
   let isCapturingShortcut = $state(false);
   let capturedShortcut = $state("");
   let captureElement: HTMLDivElement | null = $state(null);
+
+  // Tab navigation
+  type Tab = "general" | "recording" | "claude" | "advanced";
+  let activeTab = $state<Tab>("general");
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "general", label: "General" },
+    { id: "recording", label: "Recording" },
+    { id: "claude", label: "Claude" },
+    { id: "advanced", label: "Advanced" },
+  ];
 
   const languages = [
     { value: "auto", label: "Auto-detect" },
@@ -351,202 +364,253 @@
       <div class="error">{error}</div>
     {/if}
 
-    <div class="group">
-      <label>Model</label>
-      <div class="model-selector">
+    <nav class="tabs">
+      {#each tabs as tab}
         <button
-          class="model-header"
-          onclick={() => modelExpanded = !modelExpanded}
+          class="tab"
+          class:active={activeTab === tab.id}
+          onclick={() => activeTab = tab.id}
         >
-          <span class="model-selected">
-            {#if selectedModelInfo}
-              {selectedModelInfo.name}
-            {:else}
-              Select a model
-            {/if}
-          </span>
-          <span class="chevron" class:expanded={modelExpanded}>▼</span>
+          {tab.label}
         </button>
+      {/each}
+    </nav>
 
-        {#if modelExpanded}
-          <div class="model-list">
-            {#each [...modelsByCategory()] as [category, categoryModels]}
-              <div class="category-section">
-                <button
-                  class="category-header"
-                  onclick={() => {
-                    const newSet = new Set(expandedCategories);
-                    if (newSet.has(category)) {
-                      newSet.delete(category);
-                    } else {
-                      newSet.add(category);
-                    }
-                    expandedCategories = newSet;
-                  }}
-                >
-                  <span class="category-chevron" class:expanded={expandedCategories.has(category)}>▶</span>
-                  <span class="category-name">{category}</span>
-                  <span class="category-count">{categoryModels.length}</span>
-                </button>
-                {#if expandedCategories.has(category)}
-                  <div class="category-models">
-                    {#each categoryModels as model}
-                      <div
-                        class="model-item"
-                        class:selected={model.id === config.selectedModel}
-                        class:downloading={downloadingModel === model.id}
-                        class:deleting={deletingModel === model.id}
-                      >
-                        {#if downloadingModel === model.id}
-                          <div class="download-progress-bar" style="width: {downloadProgress}%"></div>
-                        {/if}
-                        <button
-                          class="model-info"
-                          onclick={() => model.status === "downloaded" && selectModel(model.id)}
-                          disabled={model.status !== "downloaded" || deletingModel === model.id}
+    <!-- General Tab -->
+    {#if activeTab === "general"}
+      <div class="group">
+        <label>Model</label>
+        <div class="model-selector">
+          <button
+            class="model-header"
+            onclick={() => modelExpanded = !modelExpanded}
+          >
+            <span class="model-selected">
+              {#if selectedModelInfo}
+                {selectedModelInfo.name}
+              {:else}
+                Select a model
+              {/if}
+            </span>
+            <span class="chevron" class:expanded={modelExpanded}>▼</span>
+          </button>
+
+          {#if modelExpanded}
+            <div class="model-list">
+              {#each [...modelsByCategory()] as [category, categoryModels]}
+                <div class="category-section">
+                  <button
+                    class="category-header"
+                    onclick={() => {
+                      const newSet = new Set(expandedCategories);
+                      if (newSet.has(category)) {
+                        newSet.delete(category);
+                      } else {
+                        newSet.add(category);
+                      }
+                      expandedCategories = newSet;
+                    }}
+                  >
+                    <span class="category-chevron" class:expanded={expandedCategories.has(category)}>▶</span>
+                    <span class="category-name">{category}</span>
+                    <span class="category-count">{categoryModels.length}</span>
+                  </button>
+                  {#if expandedCategories.has(category)}
+                    <div class="category-models">
+                      {#each categoryModels as model}
+                        <div
+                          class="model-item"
+                          class:selected={model.id === config.selectedModel}
+                          class:downloading={downloadingModel === model.id}
+                          class:deleting={deletingModel === model.id}
                         >
-                          <span class="model-name">{model.name}</span>
-                          <span class="model-size">{formatSize(model.size)}</span>
-                        </button>
-                        <div class="model-actions">
-                          {#if deletingModel === model.id}
-                            <span class="model-status">Deleting...</span>
-                          {:else if model.status === "downloaded"}
-                            {#if model.id === config.selectedModel}
-                              <span class="model-badge">Selected</span>
-                            {/if}
-                            <button
-                              class="btn-action delete"
-                              onclick={() => deleteModel(model.id)}
-                            >
-                              Delete
-                            </button>
-                          {:else if downloadingModel === model.id}
-                            <span class="model-progress">{downloadProgress.toFixed(0)}%</span>
-                          {:else}
-                            <button
-                              class="btn-action download"
-                              onclick={() => downloadModel(model.id)}
-                              disabled={downloadingModel !== null}
-                            >
-                              Download
-                            </button>
+                          {#if downloadingModel === model.id}
+                            <div class="download-progress-bar" style="width: {downloadProgress}%"></div>
                           {/if}
+                          <button
+                            class="model-info"
+                            onclick={() => model.status === "downloaded" && selectModel(model.id)}
+                            disabled={model.status !== "downloaded" || deletingModel === model.id}
+                          >
+                            <span class="model-name">{model.name}</span>
+                            <span class="model-size">{formatSize(model.size)}</span>
+                          </button>
+                          <div class="model-actions">
+                            {#if deletingModel === model.id}
+                              <span class="model-status">Deleting...</span>
+                            {:else if model.status === "downloaded"}
+                              {#if model.id === config.selectedModel}
+                                <span class="model-badge">Selected</span>
+                              {/if}
+                              <button
+                                class="btn-action delete"
+                                onclick={() => deleteModel(model.id)}
+                              >
+                                Delete
+                              </button>
+                            {:else if downloadingModel === model.id}
+                              <span class="model-progress">{downloadProgress.toFixed(0)}%</span>
+                            {:else}
+                              <button
+                                class="btn-action download"
+                                onclick={() => downloadModel(model.id)}
+                                disabled={downloadingModel !== null}
+                              >
+                                Download
+                              </button>
+                            {/if}
+                          </div>
                         </div>
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <div class="group">
-      <label>Shortcut</label>
-      {#if isCapturingShortcut}
-        <div
-          class="shortcut-capture"
-          bind:this={captureElement}
-          onkeydown={handleKeyDown}
-          tabindex="0"
-          role="button"
-        >
-          <span class="capture-display">
-            {capturedShortcut || "Press keys..."}
-          </span>
-          <div class="capture-actions">
-            <button class="btn-text" onclick={confirmCapture} disabled={!capturedShortcut}>
-              Confirm
-            </button>
-            <button class="btn-text" onclick={cancelCapture}>
-              Cancel
-            </button>
-          </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
-      {:else}
-        <div class="shortcut-display">
-          <span class="shortcut-value">{config.shortcut}</span>
-          <button class="btn-text" onclick={startCapture}>Change</button>
-        </div>
-        {#if isNativeShortcut(config.shortcut)}
-          <div class="hint">
-            {#if config.pushToTalk}
-              Hold to record, release to stop
-            {:else}
-              Press to toggle recording
-            {/if}
-          </div>
-        {/if}
-      {/if}
-    </div>
+      </div>
 
-    {#if isNativeShortcut(config.shortcut)}
-    <div class="group">
-      <label>Recording Mode</label>
-      <div class="toggle-group">
-        <button
-          class="toggle-btn"
-          class:active={!config.pushToTalk}
-          onclick={() => { config.pushToTalk = false; saveConfig(); }}
-        >
-          Toggle
-        </button>
-        <button
-          class="toggle-btn"
-          class:active={config.pushToTalk}
-          onclick={() => { config.pushToTalk = true; saveConfig(); }}
-        >
-          Push-to-Talk
-        </button>
+      <div class="group">
+        <label for="language">Language</label>
+        <select id="language" bind:value={config.language} onchange={saveConfig}>
+          {#each languages as lang}
+            <option value={lang.value}>{lang.label}</option>
+          {/each}
+        </select>
       </div>
-      <div class="hint">
-        {#if config.pushToTalk}
-          Record while holding the key
-        {:else}
-          Press once to start, again to stop
-        {/if}
-      </div>
-    </div>
     {/if}
 
-    <div class="group">
-      <label>Claude Code</label>
-      <div class="toggle-group">
-        <button
-          class="toggle-btn"
-          class:active={config.claudeCodeMode === "directPaste"}
-          onclick={() => { config.claudeCodeMode = "directPaste"; saveConfig(); }}
-        >
-          Direct Paste
-        </button>
-        <button
-          class="toggle-btn"
-          class:active={config.claudeCodeMode === "printMode"}
-          onclick={() => { config.claudeCodeMode = "printMode"; saveConfig(); }}
-        >
-          Print Mode
-        </button>
-      </div>
-      <div class="hint">
-        {#if config.claudeCodeMode === "printMode"}
-          Runs <code>claude -p</code> with transcribed text
+    <!-- Recording Tab -->
+    {#if activeTab === "recording"}
+      <div class="group">
+        <label>Shortcut</label>
+        {#if isCapturingShortcut}
+          <div
+            class="shortcut-capture"
+            bind:this={captureElement}
+            onkeydown={handleKeyDown}
+            tabindex="0"
+            role="button"
+          >
+            <span class="capture-display">
+              {capturedShortcut || "Press keys..."}
+            </span>
+            <div class="capture-actions">
+              <button class="btn-text" onclick={confirmCapture} disabled={!capturedShortcut}>
+                Confirm
+              </button>
+              <button class="btn-text" onclick={cancelCapture}>
+                Cancel
+              </button>
+            </div>
+          </div>
         {:else}
-          Pastes text at cursor position (default)
+          <div class="shortcut-display">
+            <span class="shortcut-value">{config.shortcut}</span>
+            <button class="btn-text" onclick={startCapture}>Change</button>
+          </div>
+          {#if isNativeShortcut(config.shortcut)}
+            <div class="hint">
+              {#if config.pushToTalk}
+                Hold to record, release to stop
+              {:else}
+                Press to toggle recording
+              {/if}
+            </div>
+          {/if}
         {/if}
       </div>
-    </div>
 
-    <div class="group">
-      <label for="language">Language</label>
-      <select id="language" bind:value={config.language} onchange={saveConfig}>
-        {#each languages as lang}
-          <option value={lang.value}>{lang.label}</option>
-        {/each}
-      </select>
-    </div>
+      {#if isNativeShortcut(config.shortcut)}
+      <div class="group">
+        <label>Recording Mode</label>
+        <div class="toggle-group">
+          <button
+            class="toggle-btn"
+            class:active={!config.pushToTalk}
+            onclick={() => { config.pushToTalk = false; saveConfig(); }}
+          >
+            Toggle
+          </button>
+          <button
+            class="toggle-btn"
+            class:active={config.pushToTalk}
+            onclick={() => { config.pushToTalk = true; saveConfig(); }}
+          >
+            Push-to-Talk
+          </button>
+        </div>
+        <div class="hint">
+          {#if config.pushToTalk}
+            Record while holding the key
+          {:else}
+            Press once to start, again to stop
+          {/if}
+        </div>
+      </div>
+      {/if}
+
+      <div class="group">
+        <label>Max Duration</label>
+        <div class="shortcut-display">
+          <span class="shortcut-value">{config.maxRecordingDuration}s</span>
+          <div class="duration-controls">
+            <button class="btn-text" onclick={() => { config.maxRecordingDuration = Math.max(10, config.maxRecordingDuration - 10); saveConfig(); }}>-</button>
+            <button class="btn-text" onclick={() => { config.maxRecordingDuration = Math.min(600, config.maxRecordingDuration + 10); saveConfig(); }}>+</button>
+          </div>
+        </div>
+        <div class="hint">Maximum recording time (10-600s)</div>
+      </div>
+    {/if}
+
+    <!-- Claude Code Tab -->
+    {#if activeTab === "claude"}
+      <div class="group">
+        <label>Output Mode</label>
+        <div class="toggle-group">
+          <button
+            class="toggle-btn"
+            class:active={config.claudeCodeMode === "directPaste"}
+            onclick={() => { config.claudeCodeMode = "directPaste"; saveConfig(); }}
+          >
+            Direct Paste
+          </button>
+          <button
+            class="toggle-btn"
+            class:active={config.claudeCodeMode === "printMode"}
+            onclick={() => { config.claudeCodeMode = "printMode"; saveConfig(); }}
+          >
+            Print Mode
+          </button>
+        </div>
+        <div class="hint">
+          {#if config.claudeCodeMode === "printMode"}
+            Runs <code>claude -p</code> with transcribed text
+          {:else}
+            Pastes text at cursor position (default)
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Advanced Tab -->
+    {#if activeTab === "advanced"}
+      <div class="group">
+        <label for="vocabulary">Custom Vocabulary</label>
+        <div class="hint" style="margin-top: 0; margin-bottom: 8px;">
+          Comma-separated terms to help Whisper recognize
+        </div>
+        <textarea
+          id="vocabulary"
+          class="vocabulary-input"
+          bind:value={config.customVocabulary}
+          onchange={saveConfig}
+          rows="4"
+          placeholder="Claude Code, Anthropic, Supabase..."
+        ></textarea>
+      </div>
+    {/if}
   {/if}
 </main>
 
@@ -566,9 +630,39 @@
   }
 
   main {
-    padding: 24px;
+    padding: 16px 24px 24px;
     max-width: 400px;
     margin: 0 auto;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+    gap: 0;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    background: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+    text-align: center;
+  }
+
+  .tab:hover:not(.active) {
+    color: #666;
+  }
+
+  .tab.active {
+    color: #1d1d1f;
+    border-bottom-color: #1d1d1f;
   }
 
   .warning {
@@ -930,6 +1024,31 @@
     font-style: normal;
   }
 
+  .duration-controls {
+    display: flex;
+    gap: 4px;
+  }
+
+  .vocabulary-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: "SF Mono", Monaco, monospace;
+    background: #fff;
+    color: #1d1d1f;
+    box-sizing: border-box;
+    resize: vertical;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+  }
+
+  .vocabulary-input:focus {
+    outline: none;
+    border-color: #999;
+  }
+
   .toggle-group {
     display: flex;
     border: 1px solid #e0e0e0;
@@ -965,6 +1084,33 @@
     :global(body) {
       color: #f5f5f7;
       background: #1c1c1e;
+    }
+
+    .tabs {
+      border-color: #3a3a3c;
+    }
+
+    .tab {
+      color: #666;
+    }
+
+    .tab:hover:not(.active) {
+      color: #999;
+    }
+
+    .tab.active {
+      color: #f5f5f7;
+      border-bottom-color: #f5f5f7;
+    }
+
+    .vocabulary-input {
+      background: #2c2c2e;
+      border-color: #3a3a3c;
+      color: #f5f5f7;
+    }
+
+    .vocabulary-input:focus {
+      border-color: #666;
     }
 
     select {

@@ -14,12 +14,18 @@ class IndicatorView: NSView {
         didSet {
             needsDisplay = true
             updateBlinkTimer()
+            updateElapsedTimer()
         }
     }
 
     // Blink state for animation
     private var blinkOn: Bool = true
     private var blinkTimer: Timer?
+
+    // Elapsed time tracking
+    private var recordingStartTime: Date?
+    private var elapsedTimer: Timer?
+    private var elapsedSeconds: Int = 0
 
     private func updateBlinkTimer() {
         // Stop existing timer
@@ -38,9 +44,35 @@ class IndicatorView: NSView {
         }
     }
 
+    private func updateElapsedTimer() {
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
+
+        if status == .recording {
+            recordingStartTime = Date()
+            elapsedSeconds = 0
+            elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                guard let self = self, let start = self.recordingStartTime else { return }
+                self.elapsedSeconds = Int(Date().timeIntervalSince(start))
+                self.needsDisplay = true
+            }
+        } else {
+            recordingStartTime = nil
+            elapsedSeconds = 0
+        }
+    }
+
+    private func formatElapsed(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
     func stopBlinking() {
         blinkTimer?.invalidate()
         blinkTimer = nil
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -67,7 +99,7 @@ class IndicatorView: NSView {
         switch status {
         case .recording:
             circleColor = NSColor(red: 0.9, green: 0.3, blue: 0.3, alpha: blinkOn ? 1.0 : 0.3)
-            text = "Recording..."
+            text = "Recording  \(formatElapsed(elapsedSeconds))"
         case .processing:
             circleColor = NSColor(red: 0.3, green: 0.6, blue: 0.9, alpha: blinkOn ? 1.0 : 0.3)
             text = "Processing..."
