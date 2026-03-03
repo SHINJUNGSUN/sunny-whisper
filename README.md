@@ -1,32 +1,52 @@
-# Nobs Whisper
+# Sunny's Whisper
 
-Free, local speech-to-text for macOS. No subscriptions, no API keys, no BS.
+Free, local speech-to-text for macOS — a customized fork of [nobs-whisper](https://github.com/team-attention/nobs-whisper).
 
-Tired of wrapper apps charging $10/month for OpenAI's **free** Whisper model? Same.
+No subscriptions, no API keys, no BS. Everything runs locally on your Mac.
 
 ## Download
 
-**[Download Latest Release](https://github.com/team-attention/nobs-whisper/releases/latest)**
+**[Download Latest Release](https://github.com/SHINJUNGSUN/sunny-whisper/releases/latest)**
 
-## How to Use
+## Features (Original)
 
-1. Open Nobs Whisper and go to **Settings**
-2. Download a Whisper model (start with `base` or `small`)
-3. Set your preferred hotkey
-4. Press the hotkey, speak, press again
-5. Text appears where your cursor is
+- **100% Local** — OpenAI Whisper models running entirely on your device
+- **Metal GPU Acceleration** — Fast transcription on Apple Silicon
+- **Global Hotkey** — Works anywhere, even in fullscreen apps
+- **Left/Right Key Detection** — Use RightOption, LeftCmd, etc. as single-key shortcuts
+- **Auto-paste** — Types directly into focused input, or copies to clipboard if none
+- **Multi-language** — Supports Korean, English, Japanese, Chinese, and more
+- **Custom Vocabulary** — Help Whisper recognize technical terms like "Supabase", "Claude Code", etc.
 
-That's it. Everything runs locally on your Mac. Your voice data never leaves your machine.
+## Features (Added)
 
-## Features
+### Claude Code Integration
 
-- **100% Local** - Uses OpenAI Whisper models running on your device
-- **Metal GPU Acceleration** - Fast transcription on Apple Silicon
-- **Global Hotkey** - Works anywhere, even in fullscreen apps
-- **Left/Right Key Detection** - Use RightOption, LeftCmd, etc. as single-key shortcuts
-- **Auto-paste** - Types directly into focused input, or copies to clipboard if none
-- **Multi-language** - Supports Korean, English, Japanese, Chinese, and more
-- **Custom Vocabulary** - Help Whisper recognize technical terms like "Supabase", "Claude Code", etc.
+Two output modes for seamless AI-assisted development:
+
+| Mode | Description |
+|------|-------------|
+| **Direct Paste** | Pastes transcribed text at cursor position via Cmd+V (default) |
+| **Print Mode** | Sends transcription to Claude Code CLI via `claude -p` |
+
+### 4-Tab Settings UI
+
+| Tab | Contents |
+|-----|----------|
+| **General** | Model selection (Official / Distil-Whisper / Quantized), language |
+| **Recording** | Shortcut, recording mode (Toggle / Push-to-Talk), max duration |
+| **Claude** | Output mode selector (Direct Paste / Print Mode) |
+| **Advanced** | Custom vocabulary (comma-separated terms) |
+
+### Recording Timer
+
+- Configurable max recording duration (10–600 seconds)
+- Automatic stop on timeout
+
+### Media Key Toggle
+
+- AirPods / EarPods play/pause button to toggle recording
+- Implemented via macOS `CGEventTap` raw FFI
 
 ## Models
 
@@ -63,11 +83,22 @@ npm run tauri build
 
 ## Tech Stack
 
-- [Tauri](https://tauri.app/) - Rust + Web frontend
-- [whisper-rs](https://codeberg.org/tazz4843/whisper-rs) - Whisper bindings for Rust
-- [SvelteKit](https://kit.svelte.dev/) - Frontend
-- Native Swift helper for floating indicator
+| Layer | Technology |
+|-------|-----------|
+| App Framework | [Tauri 2](https://tauri.app/) (Rust) |
+| Frontend | [SvelteKit 5](https://kit.svelte.dev/) + TypeScript |
+| Speech-to-Text | [whisper-rs](https://codeberg.org/tazz4843/whisper-rs) 0.15 (Metal) |
+| Audio Capture | [cpal](https://github.com/RustAudio/cpal) 0.15 |
+| Native Integration | Swift floating indicator, Core Graphics CGEventTap |
+| Build | Vite 6 |
+
+## Credits
+
+Forked from [team-attention/nobs-whisper](https://github.com/team-attention/nobs-whisper) — thank you for the excellent foundation.
 
 ## License
 
 MIT
+
+Copyright (c) 2025 team-attention (original)
+Copyright (c) 2025 SHINJUNGSUN (modifications)
