@@ -50,10 +50,27 @@ pub struct AppConfig {
     /// Enable media key (AirPods/EarPods play/pause) to toggle recording
     #[serde(default)]
     pub media_key_enabled: bool,
+    /// Auto-submit (press Enter) after pasting transcription in DirectPaste mode
+    #[serde(default)]
+    pub auto_submit: bool,
+    /// Apps where auto-submit (Enter) is allowed (matched against frontmost app name)
+    #[serde(default = "default_auto_submit_apps")]
+    pub auto_submit_apps: Vec<String>,
 }
 
 fn default_max_recording_duration() -> u64 {
     60
+}
+
+fn default_auto_submit_apps() -> Vec<String> {
+    vec![
+        "Terminal".to_string(),
+        "iTerm2".to_string(),
+        "Ghostty".to_string(),
+        "WezTerm".to_string(),
+        "Alacritty".to_string(),
+        "kitty".to_string(),
+    ]
 }
 
 fn default_custom_vocabulary() -> String {
@@ -72,6 +89,8 @@ impl Default for AppConfig {
             push_to_talk: false,
             claude_code_mode: ClaudeCodeMode::default(),
             media_key_enabled: false,
+            auto_submit: false,
+            auto_submit_apps: default_auto_submit_apps(),
         }
     }
 }

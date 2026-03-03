@@ -86,6 +86,79 @@ impl TextInputter {
     }
 }
 
+/// Simulate pressing the Enter key (macOS only)
+#[cfg(target_os = "macos")]
+pub fn press_enter() -> Result<(), InputError> {
+    use core_graphics::event::{CGEvent, CGEventFlags, CGKeyCode};
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    const KV_RETURN: CGKeyCode = 0x24;
+
+    // Use Private state to avoid inheriting modifier keys (Option, Cmd, etc.)
+    // from the physical keyboard. HIDSystemState would inherit any held modifiers,
+    // causing Enter to be sent as Option+Enter, Cmd+Enter, etc.
+    let source = CGEventSource::new(CGEventSourceStateID::Private)
+        .map_err(|_| InputError::TypeError("Failed to create CGEventSource".to_string()))?;
+
+    let key_down = CGEvent::new_keyboard_event(source.clone(), KV_RETURN, true)
+        .map_err(|_| InputError::TypeError("Failed to create Enter keydown event".to_string()))?;
+    key_down.set_flags(CGEventFlags::CGEventFlagNonCoalesced);
+    key_down.post(core_graphics::event::CGEventTapLocation::HID);
+
+    std::thread::sleep(std::time::Duration::from_millis(20));
+
+    let key_up = CGEvent::new_keyboard_event(source, KV_RETURN, false)
+        .map_err(|_| InputError::TypeError("Failed to create Enter keyup event".to_string()))?;
+    key_up.set_flags(CGEventFlags::CGEventFlagNonCoalesced);
+    key_up.post(core_graphics::event::CGEventTapLocation::HID);
+
+    log::info!("Enter key pressed (auto-submit)");
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn press_enter() -> Result<(), InputError> {
+    Ok(())
+}
+
+/// Get the name of the frontmost (active) application (macOS only)
+#[cfg(target_os = "macos")]
+pub fn get_frontmost_app() -> Option<String> {
+    use std::process::Command;
+
+    let script = r#"
+        tell application "System Events"
+            set frontApp to first application process whose frontmost is true
+            return name of frontApp
+        end tell
+    "#;
+
+    match Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+    {
+        Ok(output) => {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if name.is_empty() {
+                None
+            } else {
+                log::info!("Frontmost app: {}", name);
+                Some(name)
+            }
+        }
+        Err(e) => {
+            log::error!("get_frontmost_app error: {}", e);
+            None
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_frontmost_app() -> Option<String> {
+    None
+}
+
 pub fn copy_to_clipboard(text: &str) -> Result<(), InputError> {
     let mut clipboard = Clipboard::new()
         .map_err(|e| InputError::ClipboardError(e.to_string()))?;

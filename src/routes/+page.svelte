@@ -26,6 +26,8 @@
     claudeCodeMode: "directPaste" | "printMode";
     customVocabulary: string;
     mediaKeyEnabled: boolean;
+    autoSubmit: boolean;
+    autoSubmitApps: string[];
   }
 
   let models = $state<ModelInfo[]>([]);
@@ -39,6 +41,8 @@
     claudeCodeMode: "directPaste",
     customVocabulary: "",
     mediaKeyEnabled: false,
+    autoSubmit: false,
+    autoSubmitApps: ["Terminal", "iTerm2", "Ghostty", "WezTerm", "Alacritty", "kitty"],
   });
   let downloadingModel = $state<string | null>(null);
   let downloadProgress = $state<number>(0);
@@ -613,6 +617,55 @@
           {/if}
         </div>
       </div>
+
+      {#if config.claudeCodeMode === "directPaste"}
+      <div class="group">
+        <label>Auto Submit</label>
+        <div class="shortcut-display">
+          <span class="shortcut-value">
+            {config.autoSubmit ? "Enabled" : "Disabled"}
+          </span>
+          <button class="btn-text" onclick={() => { config.autoSubmit = !config.autoSubmit; saveConfig(); }}>
+            {config.autoSubmit ? "Disable" : "Enable"}
+          </button>
+        </div>
+        <div class="hint">Press Enter automatically after pasting transcription</div>
+      </div>
+
+      {#if config.autoSubmit}
+      <div class="group">
+        <label>Allowed Apps</label>
+        <div class="app-list">
+          {#each config.autoSubmitApps as app, i}
+            <div class="app-chip">
+              <span>{app}</span>
+              <button class="chip-remove" onclick={() => {
+                config.autoSubmitApps = config.autoSubmitApps.filter((_, idx) => idx !== i);
+                saveConfig();
+              }}>&times;</button>
+            </div>
+          {/each}
+          <input
+            class="app-input"
+            type="text"
+            placeholder="Add app name..."
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                const input = e.currentTarget;
+                const value = input.value.trim();
+                if (value && !config.autoSubmitApps.includes(value)) {
+                  config.autoSubmitApps = [...config.autoSubmitApps, value];
+                  input.value = "";
+                  saveConfig();
+                }
+              }
+            }}
+          />
+        </div>
+        <div class="hint">Auto-submit only works in these apps. Enter key to add.</div>
+      </div>
+      {/if}
+      {/if}
     {/if}
 
     <!-- Advanced Tab -->
@@ -1029,6 +1082,50 @@
     font-weight: 500;
   }
 
+  .app-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .app-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .chip-remove {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    font-size: 14px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .chip-remove:hover {
+    color: #c00;
+  }
+
+  .app-input {
+    border: none;
+    outline: none;
+    font-size: 12px;
+    padding: 3px 4px;
+    min-width: 100px;
+    flex: 1;
+    background: transparent;
+  }
+
   .hint {
     margin-top: 8px;
     font-size: 11px;
@@ -1299,6 +1396,20 @@
 
     .hint code {
       background: #3a3a3c;
+    }
+
+    .app-list {
+      background: #2c2c2e;
+      border-color: #3a3a3c;
+    }
+
+    .app-chip {
+      background: #3a3a3c;
+      color: #f5f5f7;
+    }
+
+    .app-input {
+      color: #f5f5f7;
     }
   }
 </style>

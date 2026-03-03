@@ -695,6 +695,8 @@ pub fn stop_recording_with_app(
         Some(state_guard.config.custom_vocabulary.clone())
     };
     let claude_code_mode = state_guard.config.claude_code_mode.clone();
+    let auto_submit = state_guard.config.auto_submit;
+    let auto_submit_apps = state_guard.config.auto_submit_apps.clone();
 
     // Set transcribing state and release lock BEFORE any heavy processing
     state_guard.is_transcribing = true;
@@ -844,6 +846,27 @@ pub fn stop_recording_with_app(
                         match type_transcription(&text_to_type) {
                             Ok(true) => {
                                 log::info!("Text typed successfully");
+                                if auto_submit {
+                                    let should_submit = if auto_submit_apps.is_empty() {
+                                        true
+                                    } else if let Some(app) = input::get_frontmost_app() {
+                                        let allowed = auto_submit_apps.iter().any(|a| {
+                                            a.eq_ignore_ascii_case(&app)
+                                        });
+                                        if !allowed {
+                                            log::info!("Auto-submit skipped: '{}' not in allowed apps", app);
+                                        }
+                                        allowed
+                                    } else {
+                                        false
+                                    };
+                                    if should_submit {
+                                        std::thread::sleep(std::time::Duration::from_millis(50));
+                                        if let Err(e) = input::press_enter() {
+                                            log::error!("Failed to press Enter (auto-submit): {}", e);
+                                        }
+                                    }
+                                }
                                 emit_state_change(&app_for_typing, &snapshot_for_typing);
                             }
                             Ok(false) => {
